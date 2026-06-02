@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>cmd-genie · ask for a command</title>
+<style>
+  :root {
+    --bg: #0b0f17; --panel: #121826; --line: #1f2937; --muted: #8b97a8;
+    --text: #e6edf6; --accent: #6ee7b7; --accent2: #38bdf8; --code: #0a0e15;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: radial-gradient(1200px 600px at 70% -10%, #15233b 0%, var(--bg) 55%);
+    color: var(--text); min-height: 100vh;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px 22px; border-bottom: 1px solid var(--line);
+  }
+  .logo {
+    width: 34px; height: 34px; border-radius: 9px; flex: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: grid; place-items: center; color: #04121a; font-weight: 800; font-size: 18px;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .data-btn {
+    margin-left: auto; background: var(--panel); color: var(--text); cursor: pointer;
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; font: inherit; font-size: 13px;
+  }
+  .data-btn:hover { border-color: var(--accent2); }
+  .data-btn.active { border-color: var(--accent); color: var(--accent); }
+  .notes { border-bottom: 1px solid var(--line); background: #0d1422; }
+  .notes-inner { max-width: 760px; margin: 0 auto; padding: 16px; }
+  .notes-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+  .notes-head .sub { color: var(--muted); font-size: 12px; }
+  #notesArea {
+    width: 100%; min-height: 180px; resize: vertical; background: var(--code); color: #d6f5e6;
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+    font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  #notesArea:focus { outline: none; border-color: var(--accent2); }
+  .notes-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+  .saved-msg { color: var(--accent); font-size: 12px; }
+  main {
+    max-width: 760px; margin: 0 auto; padding: 22px 16px 120px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .msg { display: flex; gap: 10px; }
+  .msg .who { font-size: 11px; color: var(--muted); width: 46px; flex: none; padding-top: 8px; text-transform: uppercase; letter-spacing: .5px; }
+  .bubble { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; flex: 1; min-width: 0; }
+  .msg.user .bubble { background: #11203a; border-color: #1e3a5f; }
+  .bubble p { margin: 0 0 6px; white-space: pre-wrap; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .codewrap { position: relative; margin: 8px 0; }
+  pre {
+    margin: 0; background: var(--code); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; overflow-x: auto; font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+    color: #d6f5e6;
+  }
+  .copy {
+    position: absolute; top: 8px; right: 8px; border: 1px solid var(--line);
+    background: #0f1626; color: var(--muted); border-radius: 7px; padding: 3px 9px;
+    font-size: 11px; cursor: pointer; transition: .15s;
+  }
+  .copy:hover { color: var(--text); border-color: var(--accent2); }
+  .copy.done { color: var(--accent); border-color: var(--accent); }
+  .source { display: inline-block; margin-top: 6px; font-size: 11px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+  .source.sheet { color: var(--accent); border-color: #1f4a3a; }
+  .composer {
+    position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, var(--bg) 30%);
+    padding: 18px 16px;
+  }
+  .composer .inner { max-width: 760px; margin: 0 auto; display: flex; gap: 8px; }
+  textarea {
+    flex: 1; resize: none; background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font: inherit;
+    max-height: 140px;
+  }
+  textarea:focus { outline: none; border-color: var(--accent2); }
+  button.send {
+    border: none; border-radius: 12px; padding: 0 18px; font-weight: 650; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #04121a;
+  }
+  button.send:disabled { opacity: .5; cursor: default; }
+  .hint { color: var(--muted); font-size: 12px; text-align: center; margin-top: 8px; }
+  .ex { color: var(--accent2); cursor: pointer; }
+  .ex:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">⌘</div>
+    <div>
+      <h1>cmd-genie</h1>
+      <div class="sub">ask in plain English — get the command</div>
+    </div>
+    <button class="data-btn" id="dataBtn">📝 My data</button>
+  </header>
+
+  <section class="notes" id="notes" hidden>
+    <div class="notes-inner">
+      <div class="notes-head">
+        <strong>My data</strong>
+        <span class="sub">facts the genie answers from — IPs, hosts, URLs, accounts. Not here? It says "not available".</span>
+      </div>
+      <textarea id="notesArea" spellcheck="false" placeholder="## infra&#10;- Jumpbox IP: 10.0.0.5"></textarea>
+      <div class="notes-actions">
+        <button class="send" id="saveNotes">Save</button>
+        <span class="saved-msg" id="savedMsg"></span>
+      </div>
+    </div>
+  </section>
+
+  <main id="chat">
+    <div class="msg">
+      <div class="who">genie</div>
+      <div class="bubble">
+        <p>Hey! Ask me how to do something on the command line and I'll hand you the exact command — checking your <code>commands.md</code> cheat-sheet first.</p>
+        <p>Try:
+          <span class="ex" data-q="undo my last commit but keep the changes">undo my last commit</span> ·
+          <span class="ex" data-q="compress a folder into a tar.gz">compress a folder</span> ·
+          <span class="ex" data-q="find which process is using port 8080">free up a port</span>
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <div class="composer">
+    <div class="inner">
+      <textarea id="q" rows="1" placeholder="How do I…  (Enter to send, Shift+Enter for newline)"></textarea>
+      <button class="send" id="send">Ask</button>
+    </div>
+    <div class="hint">Runs a local Gemma model via Ollama. Nothing leaves your machine.</div>
+  </div>
+
+<script>
+  const chat = document.getElementById("chat");
+  const q = document.getElementById("q");
+  const send = document.getElementById("send");
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function addMsg(who, isUser) {
+    const msg = el("div", "msg" + (isUser ? " user" : ""));
+    msg.appendChild(el("div", "who", who));
+    const bubble = el("div", "bubble");
+    msg.appendChild(bubble);
+    chat.appendChild(msg);
+    window.scrollTo(0, document.body.scrollHeight);
+    return bubble;
+  }
+
+  // Render an answer: split on ``` fences -> text / code blocks. Style the
+  // "Source: ..." trailing line as a chip.
+  function renderAnswer(bubble, text) {
+    bubble.innerHTML = "";
+    const parts = text.split("```");
+    parts.forEach((part, i) => {
+      if (i % 2 === 1) {
+        const code = part.replace(/^[a-zA-Z0-9]*\n/, "").replace(/\n$/, "");
+        const wrap = el("div", "codewrap");
+        const pre = el("pre"); pre.textContent = code;
+        const btn = el("button", "copy", "Copy");
+        btn.onclick = () => {
+          navigator.clipboard.writeText(code);
+          btn.textContent = "Copied"; btn.classList.add("done");
+          setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1200);
+        };
+        wrap.appendChild(pre); wrap.appendChild(btn);
+        bubble.appendChild(wrap);
+      } else {
+        part.split("\n").forEach((line) => {
+          line = line.trim();
+          if (!line) return;
+          const m = line.match(/^Source:\s*(.+)$/i);
+          if (m) {
+            const fromOwn = /sheet|notes/i.test(m[1]); // your cheat-sheet or your notes
+            const chip = el("span", "source" + (fromOwn ? " sheet" : ""), "Source: " + m[1]);
+            bubble.appendChild(chip);
+          } else {
+            bubble.appendChild(el("p", null, line));
+          }
+        });
+      }
+    });
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+
+  async function ask() {
+    const question = q.value.trim();
+    if (!question) return;
+    addMsg("you", true).appendChild(el("p", null, question));
+    q.value = ""; autoSize();
+    send.disabled = true;
+    const bubble = addMsg("genie", false);
+    bubble.appendChild(el("p", null, "Thinking…"));
+    try {
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+      const data = await res.json();
+      renderAnswer(bubble, data.answer || "(no response)");
+    } catch (e) {
+      bubble.innerHTML = "";
+      bubble.appendChild(el("p", null, "⚠️ Couldn't reach the backend."));
+    } finally {
+      send.disabled = false;
+      q.focus();
+    }
+  }
+
+  function autoSize() {
+    q.style.height = "auto";
+    q.style.height = Math.min(q.scrollHeight, 140) + "px";
+  }
+
+  send.onclick = ask;
+  q.addEventListener("input", autoSize);
+  q.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); }
+  });
+  document.querySelectorAll(".ex").forEach((s) => {
+    s.onclick = () => { q.value = s.dataset.q; autoSize(); ask(); };
+  });
+
+  // "My data" panel: load notes.md, edit, save back.
+  const dataBtn = document.getElementById("dataBtn");
+  const notes = document.getElementById("notes");
+  const notesArea = document.getElementById("notesArea");
+  const savedMsg = document.getElementById("savedMsg");
+  let notesLoaded = false;
+
+  dataBtn.onclick = async () => {
+    const opening = notes.hidden;
+    notes.hidden = !opening;
+    dataBtn.classList.toggle("active", opening);
+    if (opening && !notesLoaded) {
+      notesArea.value = await (await fetch("/api/notes")).text();
+      notesLoaded = true;
+    }
+  };
+
+  document.getElementById("saveNotes").onclick = async () => {
+    await fetch("/api/notes", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: notesArea.value }),
+    });
+    savedMsg.textContent = "Saved ✓";
+    setTimeout(() => { savedMsg.textContent = ""; }, 1500);
+  };
+
+  q.focus();
+</script>
+</body>
+</html>
