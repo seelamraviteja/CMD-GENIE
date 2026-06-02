@@ -1,0 +1,25 @@
+# cmd-genie in Docker. Ollama runs on your host; this container talks to it.
+#
+#   ollama serve              # on the host (must be running)
+#   docker compose up --build # build + run cmd-genie
+#
+# Open http://localhost:8090 . Your cheat-sheets live in ./data on the host and
+# are bind-mounted in, so anything you edit (in the UI or the files) survives
+# `docker compose down` and restarts.
+services:
+  cmd-genie:
+    build: .
+    container_name: cmd-genie
+    ports:
+      - "${PORT:-8090}:8090"
+    environment:
+      # host.docker.internal → the Ollama running on your machine.
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:4b}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-16384}
+    volumes:
+      - ./data:/app/data
+    extra_hosts:
+      # makes host.docker.internal resolve on Linux too (works natively on Mac/Win).
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

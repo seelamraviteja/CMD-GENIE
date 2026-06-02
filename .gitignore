@@ -4,3 +4,8 @@ __pycache__/
 .DS_Store
 .ruff_cache/
 .pytest_cache/
+.env
+
+# Personal knowledge base — real commands, hosts, credentials. Never commit it.
+# Use data.example/ as the tracked template (cp -r data.example data).
+/data/

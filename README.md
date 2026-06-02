@@ -29,28 +29,47 @@ so nothing leaves your machine.
  ┌──────────────────────────────────────────────┐
  │  tar -czf out.tar.gz <dir>          [📋 copy] │
  │  Compress a folder to a .tar.gz archive.      │
- │  Source: cheat-sheet                          │
+ │  Source: your files                           │
  └──────────────────────────────────────────────┘
 ```
 
 ## How it works
 
-No database, no embeddings. On each question the backend reads two files and
-stuffs them into the prompt as context, then asks Gemma to answer:
+No database, no embeddings. On each question the backend reads **every `*.md`
+file in [`data/`](data/)** and stuffs them into the prompt as context, then asks
+the model to answer. Everything in `data/` is one knowledge base — commands
+*and* facts:
 
-- [`commands.md`](commands.md) — your **how-to** cheat-sheet.
-- [`notes.md`](notes.md) — your **personal facts** (jumpbox IP, hostnames, URLs,
-  accounts). Ask *"what's the jumpbox IP?"* and it quotes the exact value.
-  **If a fact isn't in your notes, it replies "Not available" — it never guesses
-  an IP, host, or credential.**
+- [`data/quick-access.md`](data/quick-access.md) — your real command stash (the
+  imported *Quick Access*): how-tos **and** facts like passwords, IPs, hosts.
+- [`data/commands.md`](data/commands.md) — a general how-to cheat-sheet.
+- [`data/notes.md`](data/notes.md) — extra personal facts.
+
+Ask *"what is the postgres password for platform?"* and it quotes the exact
+value from your files. **If a fact isn't written down anywhere, it replies
+"Not available" — it never guesses an IP, host, or credential.**
 
 ```
-commands.md ─┐
-notes.md ────┴▶ FastAPI /api/ask ─▶ Ollama (Gemma) ─▶ answer + copy button
-                                                       (tagged: notes / cheat-sheet / general)
+data/*.md ──▶ FastAPI /api/ask ──▶ Ollama ──▶ answer + copy button
+                                              (tagged: your files / general knowledge)
 ```
 
-Edit your facts straight from the **📝 My data** panel in the app — no restart.
+> **Why answers got better:** Ollama defaults to a tiny ~2048-token context
+> window, which silently truncates a large cheat-sheet (and the model then
+> answers from whatever fragments survive). cmd-genie sets `OLLAMA_NUM_CTX`
+> (default `16384`) so your **whole** file is actually read, and runs at a low
+> temperature so commands come back verbatim instead of invented.
+
+Edit any file straight from the **My data** drawer in the app — pick a tab, edit,
+Save. Changes hit disk in `data/` and are picked up on the next question (no
+restart), and they persist across restarts.
+
+## Rephrase
+
+The app has a second view (**Rephrase** in the top nav): paste any text and the
+same local model fixes its grammar and structure. Pick a style — *Polish,
+Concise, Professional, Friendly, Formal,* or *Bullet points* — and copy the
+result. `POST /api/rephrase` with `{ "text": "...", "mode": "polish" }`.
 
 ## Requirements
 
@@ -58,28 +77,49 @@ Edit your facts straight from the **📝 My data** panel in the app — no resta
 - [Ollama](https://ollama.com) with a Gemma model pulled:
 
 ```bash
-ollama pull gemma3        # or gemma2 / any model you like
+ollama pull gemma3:4b     # the default; or any model you like
 ```
 
 ## Run
 
+Ollama must be running on your machine either way (`ollama serve`).
+
+Your knowledge lives in `data/`, which is **git-ignored** (it holds real hosts
+and credentials). On a fresh clone, seed it from the tracked template first:
+
 ```bash
-git clone <your-repo-url> cmd-genie && cd cmd-genie
-./run.sh                  # serves UI + API on http://localhost:8090
+cp -r data.example data    # then edit data/*.md with your real stuff
 ```
 
-Open **<http://localhost:8090>** and start asking.
+**Local (uv):**
+
+```bash
+git clone <your-repo-url> cmd-genie && cd cmd-genie
+cp -r data.example data
+./run.sh                               # defaults to gemma3:4b; override with OLLAMA_MODEL=…
+```
+
+**Docker** — the container talks to the Ollama on your host, and bind-mounts
+`./data` so your cheat-sheets survive `down`/restarts:
+
+```bash
+cp .env.example .env       # set OLLAMA_MODEL to a model you've pulled
+docker compose up --build
+```
+
+Either way, open **<http://localhost:8090>** and start asking.
 
 ## Make it yours
 
-Edit [`commands.md`](commands.md) — it's just markdown bullets:
+Edit the files in [`data/`](data/) — or use the **My data** drawer in the app.
+`commands.md` is markdown bullets; `quick-access.md` / `notes.md` are free-form:
 
 ```markdown
 ## git
 - `git switch -c <branch>` — create and switch to a new branch
 ```
 
-Changes are picked up on the next question; no restart needed.
+Changes are picked up on the next question — no restart.
 
 ## Configuration
 
@@ -87,7 +127,9 @@ Changes are picked up on the next question; no restart needed.
 |----------|---------|--------------|
 | `PORT` | `8090` | Port the web app listens on |
 | `OLLAMA_HOST` | `http://localhost:11434` | Where Ollama is running |
-| `OLLAMA_MODEL` | `gemma3` | Which pulled model to use |
+| `OLLAMA_MODEL` | `gemma3:4b` | Which pulled model to use |
+| `OLLAMA_NUM_CTX` | `16384` | Context window — raise it if your files grow large |
+| `CMD_GENIE_DATA` | `./data` | Directory of `*.md` knowledge files |
 
 ```bash
 OLLAMA_MODEL=gemma2 PORT=9000 ./run.sh
@@ -96,12 +138,14 @@ OLLAMA_MODEL=gemma2 PORT=9000 ./run.sh
 ## Project layout
 
 ```
-commands.md            your editable command cheat-sheet (how-to)
-notes.md               your personal facts (IPs, hosts, URLs, accounts)
-backend/app/main.py    FastAPI: /api/ask, /api/commands, /api/notes, serves UI
-backend/app/gemma.py   Ollama client (non-streaming /api/generate)
-frontend/index.html    single-page chat UI + "My data" editor (no build step)
-run.sh                 launcher
+data/*.md              your knowledge base — cheat-sheets + facts (git-ignored, the Docker volume)
+data.example/*.md      safe tracked template — copy to data/ on a fresh clone
+backend/app/main.py    FastAPI: /api/ask, /api/rephrase, /api/files, serves the UI
+backend/app/gemma.py   Ollama client (sets num_ctx so the whole file is read)
+frontend/index.html    single-page UI: Ask + Rephrase views, "My data" editor (no build step)
+Dockerfile             single-container image (UI + API)
+docker-compose.yml     run it with ./data bind-mounted for persistence
+run.sh                 local launcher (uv)
 ```
 
 ## Ideas / roadmap

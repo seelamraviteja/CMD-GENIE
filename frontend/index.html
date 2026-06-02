@@ -4,264 +4,522 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>cmd-genie · ask for a command</title>
+<link rel="icon" type="image/png" href="/assets/favicon.png" />
 <style>
   :root {
-    --bg: #0b0f17; --panel: #121826; --line: #1f2937; --muted: #8b97a8;
-    --text: #e6edf6; --accent: #6ee7b7; --accent2: #38bdf8; --code: #0a0e15;
+    --bg:        #09090b;
+    --bg-2:      #0d0e11;
+    --panel:     #131419;
+    --panel-2:   #181a20;
+    --line:      #24262e;
+    --line-soft: #1a1c22;
+    --text:      #ecedf1;
+    --muted:     #8c909c;
+    --faint:     #5b5f6b;
+    --amber:     #f3b85c;
+    --amber-hi:  #ffd391;
+    --teal:      #5eead4;
+    --rose:      #fb7185;
+    --code-bg:   #0b0c0f;
+    --mono: "SF Mono", "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+    --shadow: 0 18px 50px -12px rgba(0,0,0,.7);
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
-    margin: 0; font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    background: radial-gradient(1200px 600px at 70% -10%, #15233b 0%, var(--bg) 55%);
-    color: var(--text); min-height: 100vh;
+    margin: 0; color: var(--text);
+    font: 15px/1.55 var(--sans);
+    background:
+      radial-gradient(900px 520px at 78% -8%, rgba(243,184,92,.10), transparent 60%),
+      radial-gradient(700px 500px at 12% 8%, rgba(94,234,212,.05), transparent 55%),
+      var(--bg);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
   }
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .app { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; }
+
+  /* ── header ─────────────────────────────────────────────── */
   header {
-    display: flex; align-items: center; gap: 12px;
-    padding: 18px 22px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 22px; border-bottom: 1px solid var(--line-soft);
+    background: linear-gradient(var(--bg-2), transparent);
   }
-  .logo {
-    width: 34px; height: 34px; border-radius: 9px; flex: none;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    display: grid; place-items: center; color: #04121a; font-weight: 800; font-size: 18px;
+  .lamp { width: 42px; height: 42px; flex: none; object-fit: contain; animation: glow 5s ease-in-out infinite; }
+  @keyframes glow {
+    0%,100% { filter: drop-shadow(0 3px 10px rgba(243,184,92,.45)); }
+    50%     { filter: drop-shadow(0 4px 18px rgba(243,184,92,.8)); }
   }
-  header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: .2px; }
-  header .sub { color: var(--muted); font-size: 12px; }
-  .data-btn {
-    margin-left: auto; background: var(--panel); color: var(--text); cursor: pointer;
-    border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; font: inherit; font-size: 13px;
+  .brand h1 { font: 600 17px/1 var(--mono); margin: 0; letter-spacing: -.4px; }
+  .brand h1 .g { color: var(--amber); }
+  .brand .sub { color: var(--muted); font-size: 11.5px; margin-top: 3px; letter-spacing: .2px; }
+
+  /* segmented nav */
+  .nav { display: flex; gap: 3px; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 11px; margin-left: 18px; }
+  .nav button {
+    cursor: pointer; border: none; background: transparent; color: var(--muted);
+    font: 600 12.5px/1 var(--sans); padding: 8px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 7px;
+    transition: color .15s, background .15s;
   }
-  .data-btn:hover { border-color: var(--accent2); }
-  .data-btn.active { border-color: var(--accent); color: var(--accent); }
-  .notes { border-bottom: 1px solid var(--line); background: #0d1422; }
-  .notes-inner { max-width: 760px; margin: 0 auto; padding: 16px; }
-  .notes-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
-  .notes-head .sub { color: var(--muted); font-size: 12px; }
-  #notesArea {
-    width: 100%; min-height: 180px; resize: vertical; background: var(--code); color: #d6f5e6;
-    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
-    font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+  .nav button svg { width: 15px; height: 15px; }
+  .nav button:hover { color: var(--text); }
+  .nav button.active { color: #1a1206; background: linear-gradient(150deg, var(--amber-hi), var(--amber)); }
+
+  .spacer { margin-left: auto; }
+  .model-badge {
+    display: inline-flex; align-items: center; gap: 7px; font: 500 11.5px/1 var(--mono);
+    color: var(--muted); padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel);
   }
-  #notesArea:focus { outline: none; border-color: var(--accent2); }
-  .notes-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
-  .saved-msg { color: var(--accent); font-size: 12px; }
-  main {
-    max-width: 760px; margin: 0 auto; padding: 22px 16px 120px;
-    display: flex; flex-direction: column; gap: 16px;
+  .model-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .model-badge.live .dot { background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer; font: 500 13px/1 var(--sans);
+    color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 9px 13px; transition: border-color .15s, transform .08s, background .15s;
   }
-  .msg { display: flex; gap: 10px; }
-  .msg .who { font-size: 11px; color: var(--muted); width: 46px; flex: none; padding-top: 8px; text-transform: uppercase; letter-spacing: .5px; }
-  .bubble { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; flex: 1; min-width: 0; }
-  .msg.user .bubble { background: #11203a; border-color: #1e3a5f; }
-  .bubble p { margin: 0 0 6px; white-space: pre-wrap; }
-  .bubble p:last-child { margin-bottom: 0; }
-  .codewrap { position: relative; margin: 8px 0; }
+  .btn:hover { border-color: #3a3d49; background: var(--panel-2); }
+  .btn:active { transform: translateY(1px); }
+  .btn svg { width: 15px; height: 15px; }
+  .btn.accent { border-color: rgba(243,184,92,.35); color: var(--amber-hi); }
+  .btn.accent:hover { border-color: var(--amber); background: rgba(243,184,92,.08); }
+
+  /* views */
+  .view { flex: 1; min-height: 0; display: none; flex-direction: column; }
+  .view.active { display: flex; }
+  body.on-rephrase .ask-only { display: none; }
+
+  /* ── chat (ask view) ────────────────────────────────────── */
+  .scroll { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+  .scroll::-webkit-scrollbar { width: 10px; }
+  .scroll::-webkit-scrollbar-thumb { background: #20222a; border-radius: 8px; border: 3px solid var(--bg); }
+  main { max-width: 780px; margin: 0 auto; padding: 28px 20px 40px; display: flex; flex-direction: column; gap: 22px; }
+
+  .msg { display: flex; gap: 13px; animation: rise .45s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .av { width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center; font: 600 13px/1 var(--mono); }
+  .msg.user .av { background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); }
+  .msg.genie .av { background: var(--panel-2); border: 1px solid rgba(243,184,92,.3); box-shadow: 0 4px 14px -6px rgba(243,184,92,.5); }
+  .msg.genie .av img { width: 22px; height: 22px; object-fit: contain; }
+  .body { flex: 1; min-width: 0; padding-top: 2px; }
+  .name { font: 600 11px/1 var(--mono); letter-spacing: .8px; text-transform: uppercase; color: var(--faint); margin-bottom: 7px; }
+  .msg.genie .name { color: var(--amber); }
+  .bubble p { margin: 0 0 9px; } .bubble p:last-child { margin: 0; }
+  .bubble code.inline { font: 13px/1 var(--mono); background: #1c1e25; border: 1px solid var(--line); padding: 2px 6px; border-radius: 6px; color: var(--amber-hi); }
+  .codewrap { position: relative; margin: 12px 0; }
   pre {
-    margin: 0; background: var(--code); border: 1px solid var(--line); border-radius: 10px;
-    padding: 12px 14px; overflow-x: auto; font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
-    color: #d6f5e6;
+    margin: 0; background: var(--code-bg); border: 1px solid var(--line); border-left: 2px solid var(--amber);
+    border-radius: 10px; padding: 14px 15px; overflow-x: auto; font: 13px/1.65 var(--mono); color: #e6f0ea;
   }
+  pre::-webkit-scrollbar { height: 8px; } pre::-webkit-scrollbar-thumb { background: #23252d; border-radius: 8px; }
   .copy {
-    position: absolute; top: 8px; right: 8px; border: 1px solid var(--line);
-    background: #0f1626; color: var(--muted); border-radius: 7px; padding: 3px 9px;
-    font-size: 11px; cursor: pointer; transition: .15s;
+    position: absolute; top: 9px; right: 9px; border: 1px solid var(--line); background: #14161c;
+    color: var(--muted); border-radius: 8px; padding: 4px 10px; font: 500 11px/1 var(--mono); cursor: pointer; opacity: 0; transition: .15s;
   }
-  .copy:hover { color: var(--text); border-color: var(--accent2); }
-  .copy.done { color: var(--accent); border-color: var(--accent); }
-  .source { display: inline-block; margin-top: 6px; font-size: 11px; color: var(--muted);
-    border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
-  .source.sheet { color: var(--accent); border-color: #1f4a3a; }
-  .composer {
-    position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, var(--bg) 30%);
-    padding: 18px 16px;
+  .codewrap:hover .copy { opacity: 1; }
+  .copy:hover { color: var(--text); border-color: #3a3d49; }
+  .copy.done { color: #04120c; background: var(--teal); border-color: var(--teal); opacity: 1; }
+  .source { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; font: 500 11px/1 var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; }
+  .source::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+  .source.own { color: var(--teal); border-color: rgba(94,234,212,.3); }
+  .source.own::before { background: var(--teal); box-shadow: 0 0 7px var(--teal); }
+
+  .dots span { display: inline-block; width: 6px; height: 6px; margin-right: 4px; border-radius: 50%; background: var(--amber); animation: blink 1.2s infinite both; }
+  .dots span:nth-child(2) { animation-delay: .2s; } .dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,80%,100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+
+  .hero { text-align: center; padding: 30px 8px 8px; animation: rise .5s ease both; }
+  .hero .hero-logo {
+    width: 210px; max-width: 64%; height: auto; display: block; margin: 0 auto 18px;
+    filter: drop-shadow(0 14px 44px rgba(243,184,92,.34)); animation: glow 5s ease-in-out infinite;
   }
-  .composer .inner { max-width: 760px; margin: 0 auto; display: flex; gap: 8px; }
-  textarea {
-    flex: 1; resize: none; background: var(--panel); color: var(--text);
-    border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font: inherit;
-    max-height: 140px;
+  .hero h2 { font: 600 24px/1.2 var(--mono); letter-spacing: -.6px; margin: 0 0 8px; }
+  .hero p { color: var(--muted); max-width: 440px; margin: 0 auto 24px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; max-width: 560px; margin: 0 auto; }
+  .chip { cursor: pointer; font: 500 12.5px/1 var(--sans); color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px; transition: .15s; text-align: left; }
+  .chip:hover { border-color: var(--amber); color: var(--amber-hi); transform: translateY(-1px); }
+  .chip .k { color: var(--faint); margin-right: 6px; font-family: var(--mono); font-size: 11px; }
+  .chip:hover .k { color: var(--amber); }
+
+  /* ── composer ──────────────────────────────────────────── */
+  .composer { border-top: 1px solid var(--line-soft); background: linear-gradient(transparent, var(--bg-2) 40%); padding: 16px 20px 18px; }
+  .composer .inner { max-width: 780px; margin: 0 auto; }
+  .field { display: flex; gap: 10px; align-items: flex-end; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 8px 8px 8px 16px; transition: border-color .15s, box-shadow .15s; }
+  .field:focus-within { border-color: rgba(243,184,92,.45); box-shadow: 0 0 0 3px rgba(243,184,92,.08); }
+  textarea#q { flex: 1; resize: none; background: transparent; color: var(--text); border: none; outline: none; font: 15px/1.5 var(--sans); padding: 8px 0; max-height: 160px; }
+  textarea#q::placeholder { color: var(--faint); }
+  .send { flex: none; border: none; cursor: pointer; border-radius: 11px; padding: 11px 16px; font: 600 14px/1 var(--sans); color: #1a1206; background: linear-gradient(150deg, var(--amber-hi), var(--amber)); display: inline-flex; align-items: center; gap: 7px; transition: filter .15s, transform .08s; }
+  .send:hover { filter: brightness(1.07); } .send:active { transform: translateY(1px); }
+  .send:disabled { opacity: .45; cursor: default; filter: none; }
+  .send svg { width: 16px; height: 16px; }
+  .foot { color: var(--faint); font-size: 11.5px; text-align: center; margin-top: 11px; font-family: var(--mono); }
+  .foot b { color: var(--muted); font-weight: 500; }
+
+  /* ── rephrase view ─────────────────────────────────────── */
+  .rscroll { flex: 1; overflow-y: auto; }
+  .rscroll::-webkit-scrollbar { width: 10px; } .rscroll::-webkit-scrollbar-thumb { background: #20222a; border-radius: 8px; border: 3px solid var(--bg); }
+  .rwrap { max-width: 980px; margin: 0 auto; padding: 30px 20px 48px; }
+  .rhead { margin-bottom: 18px; }
+  .rhead h2 { font: 600 22px/1.2 var(--mono); letter-spacing: -.5px; margin: 0 0 6px; }
+  .rhead h2 .g { color: var(--amber); }
+  .rhead p { color: var(--muted); margin: 0; font-size: 13.5px; }
+  .modes { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 20px; }
+  .mode {
+    cursor: pointer; font: 600 12.5px/1 var(--sans); color: var(--muted); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 999px; padding: 9px 15px; transition: .15s;
   }
-  textarea:focus { outline: none; border-color: var(--accent2); }
-  button.send {
-    border: none; border-radius: 12px; padding: 0 18px; font-weight: 650; cursor: pointer;
-    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #04121a;
+  .mode:hover { color: var(--text); border-color: #3a3d49; }
+  .mode.active { color: #1a1206; background: linear-gradient(150deg, var(--amber-hi), var(--amber)); border-color: transparent; }
+  .mode small { display: block; font-weight: 500; font-size: 10px; opacity: .8; margin-top: 2px; }
+
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .pane { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; min-height: 340px; overflow: hidden; }
+  .pane-head { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--line-soft); }
+  .pane-head .lbl { font: 600 11px/1 var(--mono); letter-spacing: .8px; text-transform: uppercase; color: var(--faint); }
+  .pane-head .lbl.out { color: var(--amber); }
+  .pane-head .tools { margin-left: auto; display: flex; gap: 8px; }
+  .mini { cursor: pointer; border: 1px solid var(--line); background: #14161c; color: var(--muted); border-radius: 8px; padding: 5px 10px; font: 500 11px/1 var(--mono); transition: .15s; }
+  .mini:hover { color: var(--text); border-color: #3a3d49; }
+  .mini.done { color: #04120c; background: var(--teal); border-color: var(--teal); }
+  .mini:disabled { opacity: .4; cursor: default; }
+  textarea#rinput {
+    flex: 1; resize: none; background: transparent; color: var(--text); border: none; outline: none;
+    padding: 14px 16px; font: 14.5px/1.65 var(--sans); width: 100%;
   }
-  button.send:disabled { opacity: .5; cursor: default; }
-  .hint { color: var(--muted); font-size: 12px; text-align: center; margin-top: 8px; }
-  .ex { color: var(--accent2); cursor: pointer; }
-  .ex:hover { text-decoration: underline; }
+  textarea#rinput::placeholder { color: var(--faint); }
+  .rout { flex: 1; padding: 14px 16px; overflow-y: auto; white-space: pre-wrap; font: 14.5px/1.7 var(--sans); color: var(--text); }
+  .rout.empty { color: var(--faint); display: flex; align-items: center; justify-content: center; text-align: center; }
+  .pane-foot { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--line-soft); }
+  .count { font: 500 11px/1 var(--mono); color: var(--faint); }
+  .run {
+    margin-left: auto; flex: none; border: none; cursor: pointer; border-radius: 10px; padding: 10px 16px;
+    font: 600 13.5px/1 var(--sans); color: #1a1206; background: linear-gradient(150deg, var(--amber-hi), var(--amber));
+    display: inline-flex; align-items: center; gap: 7px; transition: filter .15s, transform .08s;
+  }
+  .run:hover { filter: brightness(1.07); } .run:active { transform: translateY(1px); }
+  .run:disabled { opacity: .45; cursor: default; filter: none; }
+  .run svg { width: 15px; height: 15px; }
+  .rhint { font: 500 11px/1 var(--mono); color: var(--faint); margin-left: auto; }
+
+  /* ── data drawer ───────────────────────────────────────── */
+  .scrim { position: fixed; inset: 0; background: rgba(4,4,6,.6); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 20; }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: fixed; top: 0; right: 0; height: 100%; width: min(560px, 92vw); z-index: 21;
+    background: var(--bg-2); border-left: 1px solid var(--line); box-shadow: var(--shadow);
+    transform: translateX(100%); transition: transform .3s cubic-bezier(.3,.7,.2,1); display: flex; flex-direction: column;
+  }
+  .drawer.open { transform: none; }
+  .drawer-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--line-soft); }
+  .drawer-head h3 { margin: 0; font: 600 15px/1 var(--mono); }
+  .drawer-head p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+  .x { margin-left: auto; }
+  .tabs { display: flex; gap: 6px; padding: 14px 20px 0; flex-wrap: wrap; }
+  .tab { cursor: pointer; font: 500 12px/1 var(--mono); color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 9px 9px 0 0; border-bottom: none; padding: 9px 13px; transition: .15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--amber-hi); background: var(--panel); border-color: var(--line); }
+  .editor-wrap { flex: 1; padding: 0 20px 16px; display: flex; flex-direction: column; min-height: 0; }
+  textarea#editor { flex: 1; width: 100%; resize: none; background: var(--code-bg); color: #d9efe6; border: 1px solid var(--line); border-radius: 0 10px 10px 10px; padding: 14px 15px; font: 12.5px/1.65 var(--mono); outline: none; min-height: 0; }
+  textarea#editor:focus { border-color: rgba(243,184,92,.4); }
+  .drawer-actions { display: flex; align-items: center; gap: 12px; padding: 14px 20px 18px; border-top: 1px solid var(--line-soft); }
+  .saved { color: var(--teal); font: 500 12px/1 var(--mono); opacity: 0; transition: opacity .2s; }
+  .saved.show { opacity: 1; }
+  .hint-sm { color: var(--faint); font-size: 11.5px; margin-left: auto; }
+
+  @media (max-width: 720px) {
+    .panes { grid-template-columns: 1fr; }
+    .pane { min-height: 240px; }
+    .brand .sub { display: none; }
+    .nav button span { display: none; }
+    .nav button { padding: 9px 11px; }
+  }
 </style>
 </head>
 <body>
+<div class="app">
   <header>
-    <div class="logo">⌘</div>
-    <div>
-      <h1>cmd-genie</h1>
-      <div class="sub">ask in plain English — get the command</div>
+    <img class="lamp" src="/assets/mark.png" alt="cmd-genie" />
+    <div class="brand">
+      <h1>cmd<span class="g">·</span>genie</h1>
+      <div class="sub">your local command &amp; writing genie</div>
     </div>
-    <button class="data-btn" id="dataBtn">📝 My data</button>
+    <nav class="nav" id="nav">
+      <button data-view="ask" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>
+        <span>Ask</span>
+      </button>
+      <button data-view="rephrase">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+        <span>Rephrase</span>
+      </button>
+    </nav>
+    <div class="spacer"></div>
+    <span class="model-badge" id="modelBadge"><span class="dot"></span><span id="modelName">…</span></span>
+    <button class="btn ask-only" id="newChat" title="Start a new chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      New
+    </button>
+    <button class="btn accent ask-only" id="dataBtn" title="Edit the genie's knowledge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      My data
+    </button>
   </header>
 
-  <section class="notes" id="notes" hidden>
-    <div class="notes-inner">
-      <div class="notes-head">
-        <strong>My data</strong>
-        <span class="sub">facts the genie answers from — IPs, hosts, URLs, accounts. Not here? It says "not available".</span>
-      </div>
-      <textarea id="notesArea" spellcheck="false" placeholder="## infra&#10;- Jumpbox IP: 10.0.0.5"></textarea>
-      <div class="notes-actions">
-        <button class="send" id="saveNotes">Save</button>
-        <span class="saved-msg" id="savedMsg"></span>
+  <!-- ─── ASK VIEW ─────────────────────────────────────── -->
+  <section class="view active" id="view-ask">
+    <div class="scroll" id="scroll"><main id="chat"></main></div>
+    <div class="composer">
+      <div class="inner">
+        <div class="field">
+          <textarea id="q" rows="1" placeholder="How do I…   ·   what is the postgres password for platform?"></textarea>
+          <button class="send" id="send">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            Ask
+          </button>
+        </div>
+        <div class="foot">runs a local model via <b>Ollama</b> · checks <b>your files</b> first · nothing leaves your machine</div>
       </div>
     </div>
   </section>
 
-  <main id="chat">
-    <div class="msg">
-      <div class="who">genie</div>
-      <div class="bubble">
-        <p>Hey! Ask me how to do something on the command line and I'll hand you the exact command — checking your <code>commands.md</code> cheat-sheet first.</p>
-        <p>Try:
-          <span class="ex" data-q="undo my last commit but keep the changes">undo my last commit</span> ·
-          <span class="ex" data-q="compress a folder into a tar.gz">compress a folder</span> ·
-          <span class="ex" data-q="find which process is using port 8080">free up a port</span>
-        </p>
+  <!-- ─── REPHRASE VIEW ────────────────────────────────── -->
+  <section class="view" id="view-rephrase">
+    <div class="rscroll">
+      <div class="rwrap">
+        <div class="rhead">
+          <h2>Rephrase &amp; <span class="g">restructure</span></h2>
+          <p>Paste any text — the genie fixes the grammar and structure in the style you pick. Stays on your machine.</p>
+        </div>
+        <div class="modes" id="modes"></div>
+        <div class="panes">
+          <div class="pane">
+            <div class="pane-head">
+              <span class="lbl">Your text</span>
+              <div class="tools"><button class="mini" id="rclear">Clear</button></div>
+            </div>
+            <textarea id="rinput" placeholder="Type or paste the text you want cleaned up…"></textarea>
+            <div class="pane-foot">
+              <span class="count" id="rcount">0 chars</span>
+              <button class="run" id="rrun">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>
+                Rephrase
+              </button>
+            </div>
+          </div>
+          <div class="pane">
+            <div class="pane-head">
+              <span class="lbl out">Rewritten</span>
+              <div class="tools"><button class="mini" id="rcopy" disabled>Copy</button></div>
+            </div>
+            <div class="rout empty" id="rout">Your rewritten text will appear here.</div>
+            <div class="pane-foot"><span class="rhint">⌘/Ctrl + Enter to rephrase</span></div>
+          </div>
+        </div>
       </div>
     </div>
-  </main>
+  </section>
+</div>
 
-  <div class="composer">
-    <div class="inner">
-      <textarea id="q" rows="1" placeholder="How do I…  (Enter to send, Shift+Enter for newline)"></textarea>
-      <button class="send" id="send">Ask</button>
+<!-- data drawer -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="My data">
+  <div class="drawer-head">
+    <div>
+      <h3>My data</h3>
+      <p>What the genie knows — commands, notes, credentials. Edits save to disk and persist across restarts.</p>
     </div>
-    <div class="hint">Runs a local Gemma model via Ollama. Nothing leaves your machine.</div>
+    <button class="btn x" id="closeDrawer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
   </div>
+  <div class="tabs" id="tabs"></div>
+  <div class="editor-wrap"><textarea id="editor" spellcheck="false" placeholder="Loading…"></textarea></div>
+  <div class="drawer-actions">
+    <button class="btn accent" id="saveFile">Save</button>
+    <span class="saved" id="savedMsg">Saved ✓</span>
+    <span class="hint-sm" id="editHint"></span>
+  </div>
+</aside>
 
 <script>
-  const chat = document.getElementById("chat");
-  const q = document.getElementById("q");
-  const send = document.getElementById("send");
+  const $ = (id) => document.getElementById(id);
+  const chat = $("chat"), scroll = $("scroll"), q = $("q"), send = $("send");
+  const STORE = "cmdgenie.history.v1";
 
-  function el(tag, cls, text) {
-    const e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text != null) e.textContent = text;
-    return e;
-  }
+  const EXAMPLES = [
+    { k: "fact",  q: "what is the postgres password for platform?" },
+    { k: "fact",  q: "kong admin api key?" },
+    { k: "howto", q: "how do I upgrade discourse?" },
+    { k: "howto", q: "disable gitlab https/ssl verification" },
+    { k: "howto", q: "compress a folder into a tar.gz" },
+  ];
 
-  function addMsg(who, isUser) {
-    const msg = el("div", "msg" + (isUser ? " user" : ""));
-    msg.appendChild(el("div", "who", who));
-    const bubble = el("div", "bubble");
-    msg.appendChild(bubble);
-    chat.appendChild(msg);
-    window.scrollTo(0, document.body.scrollHeight);
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+  function toBottom() { scroll.scrollTop = scroll.scrollHeight; }
+  function inlineHTML(line) { return esc(line).replace(/`([^`]+)`/g, '<code class="inline">$1</code>'); }
+
+  // ── view switching ────────────────────────────────────────
+  $("nav").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-view]"); if (!b) return;
+    const v = b.dataset.view;
+    [...$("nav").children].forEach((x) => x.classList.toggle("active", x === b));
+    $("view-ask").classList.toggle("active", v === "ask");
+    $("view-rephrase").classList.toggle("active", v === "rephrase");
+    document.body.classList.toggle("on-rephrase", v === "rephrase");
+    (v === "ask" ? q : $("rinput")).focus();
+  });
+
+  // ── ask view ──────────────────────────────────────────────
+  function addMsg(role) {
+    const isUser = role === "user";
+    const msg = el("div", "msg " + (isUser ? "user" : "genie"));
+    const av = el("div", "av");
+    if (isUser) av.textContent = "you"; else av.innerHTML = '<img src="/assets/mark.png" alt="genie">';
+    const body = el("div", "body");
+    body.appendChild(el("div", "name", isUser ? "you" : "genie"));
+    const bubble = el("div", "bubble"); body.appendChild(bubble);
+    msg.appendChild(av); msg.appendChild(body); chat.appendChild(msg); toBottom();
     return bubble;
   }
-
-  // Render an answer: split on ``` fences -> text / code blocks. Style the
-  // "Source: ..." trailing line as a chip.
   function renderAnswer(bubble, text) {
     bubble.innerHTML = "";
-    const parts = text.split("```");
-    parts.forEach((part, i) => {
+    text.split("```").forEach((part, i) => {
       if (i % 2 === 1) {
-        const code = part.replace(/^[a-zA-Z0-9]*\n/, "").replace(/\n$/, "");
-        const wrap = el("div", "codewrap");
-        const pre = el("pre"); pre.textContent = code;
+        const code = part.replace(/^[a-zA-Z0-9_-]*\n/, "").replace(/\n$/, "");
+        const wrap = el("div", "codewrap"); const pre = el("pre"); pre.textContent = code;
         const btn = el("button", "copy", "Copy");
-        btn.onclick = () => {
-          navigator.clipboard.writeText(code);
-          btn.textContent = "Copied"; btn.classList.add("done");
-          setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1200);
-        };
-        wrap.appendChild(pre); wrap.appendChild(btn);
-        bubble.appendChild(wrap);
+        btn.onclick = () => { navigator.clipboard.writeText(code); btn.textContent = "Copied"; btn.classList.add("done");
+          setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1200); };
+        wrap.appendChild(pre); wrap.appendChild(btn); bubble.appendChild(wrap);
       } else {
         part.split("\n").forEach((line) => {
-          line = line.trim();
-          if (!line) return;
+          line = line.trim(); if (!line) return;
           const m = line.match(/^Source:\s*(.+)$/i);
-          if (m) {
-            const fromOwn = /sheet|notes/i.test(m[1]); // your cheat-sheet or your notes
-            const chip = el("span", "source" + (fromOwn ? " sheet" : ""), "Source: " + m[1]);
-            bubble.appendChild(chip);
-          } else {
-            bubble.appendChild(el("p", null, line));
-          }
+          if (m) { const own = /file|sheet|note/i.test(m[1]); bubble.appendChild(el("span", "source" + (own ? " own" : ""), "Source: " + m[1])); }
+          else { const p = el("p"); p.innerHTML = inlineHTML(line); bubble.appendChild(p); }
         });
       }
     });
-    window.scrollTo(0, document.body.scrollHeight);
+    toBottom();
   }
 
+  let history = [];
+  function load() { try { history = JSON.parse(localStorage.getItem(STORE)) || []; } catch { history = []; } }
+  function persist() { localStorage.setItem(STORE, JSON.stringify(history)); }
+
+  function showEmpty() {
+    chat.innerHTML = "";
+    const hero = el("div", "hero");
+    hero.innerHTML = `<img class="hero-logo" src="/assets/logo.png" alt="CMD Genie"><h2>What can I dig up for you?</h2>
+      <p>Ask how to do something, or look up a fact from your files — an IP, a password, a host. I check <b>your data</b> first.</p>`;
+    const chips = el("div", "chips");
+    EXAMPLES.forEach((ex) => { const c = el("button", "chip"); c.innerHTML = `<span class="k">${ex.k}</span>${esc(ex.q)}`;
+      c.onclick = () => { q.value = ex.q; autosize(); ask(); }; chips.appendChild(c); });
+    hero.appendChild(chips); chat.appendChild(hero);
+  }
+  function renderHistory() {
+    if (!history.length) { showEmpty(); return; }
+    chat.innerHTML = "";
+    history.forEach((m) => { const b = addMsg(m.role);
+      if (m.role === "user") { const p = el("p"); p.innerHTML = inlineHTML(m.text); b.appendChild(p); } else renderAnswer(b, m.text); });
+  }
   async function ask() {
     const question = q.value.trim();
-    if (!question) return;
-    addMsg("you", true).appendChild(el("p", null, question));
-    q.value = ""; autoSize();
-    send.disabled = true;
-    const bubble = addMsg("genie", false);
-    bubble.appendChild(el("p", null, "Thinking…"));
+    if (!question || send.disabled) return;
+    if (!history.length) chat.innerHTML = "";
+    const ub = addMsg("user"); const up = el("p"); up.innerHTML = inlineHTML(question); ub.appendChild(up);
+    history.push({ role: "user", text: question }); persist();
+    q.value = ""; autosize(); send.disabled = true;
+    const bubble = addMsg("genie"); bubble.innerHTML = '<span class="dots"><span></span><span></span><span></span></span>';
     try {
-      const res = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
-      });
-      const data = await res.json();
-      renderAnswer(bubble, data.answer || "(no response)");
-    } catch (e) {
-      bubble.innerHTML = "";
-      bubble.appendChild(el("p", null, "⚠️ Couldn't reach the backend."));
-    } finally {
-      send.disabled = false;
-      q.focus();
-    }
+      const res = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) });
+      const data = await res.json(); const answer = data.answer || "(no response)";
+      renderAnswer(bubble, answer); history.push({ role: "genie", text: answer }); persist();
+    } catch { bubble.innerHTML = ""; bubble.appendChild(el("p", null, "⚠️ Couldn't reach the backend. Is it running?")); }
+    finally { send.disabled = false; q.focus(); }
   }
-
-  function autoSize() {
-    q.style.height = "auto";
-    q.style.height = Math.min(q.scrollHeight, 140) + "px";
-  }
-
+  function autosize() { q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 160) + "px"; }
   send.onclick = ask;
-  q.addEventListener("input", autoSize);
-  q.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); }
-  });
-  document.querySelectorAll(".ex").forEach((s) => {
-    s.onclick = () => { q.value = s.dataset.q; autoSize(); ask(); };
-  });
+  q.addEventListener("input", autosize);
+  q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
+  $("newChat").onclick = () => { history = []; persist(); showEmpty(); q.focus(); };
 
-  // "My data" panel: load notes.md, edit, save back.
-  const dataBtn = document.getElementById("dataBtn");
-  const notes = document.getElementById("notes");
-  const notesArea = document.getElementById("notesArea");
-  const savedMsg = document.getElementById("savedMsg");
-  let notesLoaded = false;
+  // ── rephrase view ─────────────────────────────────────────
+  const MODES = [
+    { id: "polish",       label: "Polish",       sub: "grammar + flow" },
+    { id: "concise",      label: "Concise",      sub: "tighter" },
+    { id: "professional", label: "Professional", sub: "work tone" },
+    { id: "friendly",     label: "Friendly",     sub: "casual" },
+    { id: "formal",       label: "Formal",       sub: "precise" },
+    { id: "bullets",      label: "Bullet points",sub: "restructure" },
+  ];
+  let mode = "polish";
+  const rinput = $("rinput"), rout = $("rout"), rrun = $("rrun"), rcopy = $("rcopy"), rcount = $("rcount");
 
-  dataBtn.onclick = async () => {
-    const opening = notes.hidden;
-    notes.hidden = !opening;
-    dataBtn.classList.toggle("active", opening);
-    if (opening && !notesLoaded) {
-      notesArea.value = await (await fetch("/api/notes")).text();
-      notesLoaded = true;
-    }
-  };
-
-  document.getElementById("saveNotes").onclick = async () => {
-    await fetch("/api/notes", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: notesArea.value }),
+  (function buildModes() {
+    MODES.forEach((m) => {
+      const b = el("button", "mode" + (m.id === mode ? " active" : ""));
+      b.innerHTML = `${m.label}<small>${m.sub}</small>`;
+      b.onclick = () => { mode = m.id; [...$("modes").children].forEach((x) => x.classList.toggle("active", x === b)); rinput.focus(); };
+      $("modes").appendChild(b);
     });
-    savedMsg.textContent = "Saved ✓";
-    setTimeout(() => { savedMsg.textContent = ""; }, 1500);
+  })();
+
+  function updateCount() { rcount.textContent = rinput.value.length + " chars"; }
+  rinput.addEventListener("input", updateCount);
+  $("rclear").onclick = () => { rinput.value = ""; updateCount(); rinput.focus(); };
+
+  async function rephrase() {
+    const text = rinput.value.trim();
+    if (!text || rrun.disabled) return;
+    rrun.disabled = true; rcopy.disabled = true;
+    rout.classList.remove("empty");
+    rout.innerHTML = '<span class="dots"><span></span><span></span><span></span></span>';
+    try {
+      const res = await fetch("/api/rephrase", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, mode }) });
+      const data = await res.json();
+      rout.textContent = data.result || "(no response)";
+      rcopy.disabled = !data.result;
+    } catch { rout.textContent = "⚠️ Couldn't reach the backend. Is it running?"; }
+    finally { rrun.disabled = false; }
+  }
+  rrun.onclick = rephrase;
+  rinput.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); rephrase(); } });
+  rcopy.onclick = () => { navigator.clipboard.writeText(rout.textContent); rcopy.textContent = "Copied"; rcopy.classList.add("done");
+    setTimeout(() => { rcopy.textContent = "Copy"; rcopy.classList.remove("done"); }, 1200); };
+
+  // ── model badge ───────────────────────────────────────────
+  fetch("/api/health").then((r) => r.json()).then((d) => { $("modelName").textContent = d.model || "ollama"; $("modelBadge").classList.add("live"); })
+    .catch(() => { $("modelName").textContent = "offline"; });
+
+  // ── data drawer ───────────────────────────────────────────
+  const drawer = $("drawer"), scrim = $("scrim"), tabs = $("tabs"), editor = $("editor");
+  let current = null, files = [];
+  function openDrawer() { drawer.classList.add("open"); scrim.classList.add("open"); if (!files.length) initFiles(); }
+  function closeDrawer() { drawer.classList.remove("open"); scrim.classList.remove("open"); }
+  $("dataBtn").onclick = openDrawer; $("closeDrawer").onclick = closeDrawer; scrim.onclick = closeDrawer;
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+  async function initFiles() {
+    const data = await (await fetch("/api/files")).json(); files = data.files || []; tabs.innerHTML = "";
+    files.forEach((name) => { const t = el("button", "tab", name); t.onclick = () => selectFile(name); tabs.appendChild(t); });
+    if (files.length) selectFile(files.includes("quick-access.md") ? "quick-access.md" : files[0]);
+  }
+  async function selectFile(name) {
+    current = name; [...tabs.children].forEach((t) => t.classList.toggle("active", t.textContent === name));
+    editor.value = "Loading…"; editor.value = await (await fetch("/api/files/" + encodeURIComponent(name))).text(); $("editHint").textContent = name;
+  }
+  $("saveFile").onclick = async () => {
+    if (!current) return;
+    await fetch("/api/files/" + encodeURIComponent(current), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: editor.value }) });
+    const s = $("savedMsg"); s.classList.add("show"); setTimeout(() => s.classList.remove("show"), 1600);
   };
 
-  q.focus();
+  // ── boot ──────────────────────────────────────────────────
+  load(); renderHistory(); autosize(); updateCount(); q.focus();
 </script>
 </body>
 </html>

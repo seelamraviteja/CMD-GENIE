@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 PORT="${PORT:-8090}"
-MODEL="${OLLAMA_MODEL:-gemma3}"
+MODEL="${OLLAMA_MODEL:-gemma3:4b}"
 
 # Friendly nudge if Ollama isn't reachable (the app still starts).
 if ! curl -fsS "${OLLAMA_HOST:-http://localhost:11434}/api/tags" >/dev/null 2>&1; then
