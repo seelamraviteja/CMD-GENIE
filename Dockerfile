@@ -18,8 +18,9 @@ COPY data.example ./data
 
 ENV CMD_GENIE_DATA=/app/data \
     OLLAMA_HOST=http://host.docker.internal:11434 \
-    OLLAMA_MODEL=gemma3:4b \
+    OLLAMA_MODEL=gemma4:e4b \
     OLLAMA_NUM_CTX=16384 \
+    OLLAMA_KEEP_ALIVE=10m \
     PORT=8090
 
 EXPOSE 8090

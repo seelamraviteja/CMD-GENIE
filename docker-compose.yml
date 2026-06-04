@@ -15,8 +15,9 @@ services:
     environment:
       # host.docker.internal → the Ollama running on your machine.
       OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:4b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma4:e4b}
       OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-16384}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-10m}
     volumes:
       - ./data:/app/data
     extra_hosts:

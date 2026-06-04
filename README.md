@@ -50,9 +50,14 @@ value from your files. **If a fact isn't written down anywhere, it replies
 "Not available" — it never guesses an IP, host, or credential.**
 
 ```
-data/*.md ──▶ FastAPI /api/ask ──▶ Ollama ──▶ answer + copy button
+data/*.md ──▶ FastAPI /api/ask ──▶ Ollama ──▶ answer streamed token-by-token
+                                              + copy button
                                               (tagged: your files / general knowledge)
 ```
+
+Answers **stream in as they're generated** (the backend proxies Ollama's
+streaming API and the UI renders tokens live), so you see text within moments
+instead of staring at a blank box.
 
 > **Why answers got better:** Ollama defaults to a tiny ~2048-token context
 > window, which silently truncates a large cheat-sheet (and the model then
@@ -77,7 +82,7 @@ result. `POST /api/rephrase` with `{ "text": "...", "mode": "polish" }`.
 - [Ollama](https://ollama.com) with a Gemma model pulled:
 
 ```bash
-ollama pull gemma3:4b     # the default; or any model you like
+ollama pull gemma4:e4b     # the default; or any model you like
 ```
 
 ## Run
@@ -96,7 +101,7 @@ cp -r data.example data    # then edit data/*.md with your real stuff
 ```bash
 git clone <your-repo-url> cmd-genie && cd cmd-genie
 cp -r data.example data
-./run.sh                               # defaults to gemma3:4b; override with OLLAMA_MODEL=…
+./run.sh                               # defaults to gemma4:e4b; override with OLLAMA_MODEL=…
 ```
 
 **Docker** — the container talks to the Ollama on your host, and bind-mounts
@@ -127,8 +132,9 @@ Changes are picked up on the next question — no restart.
 |----------|---------|--------------|
 | `PORT` | `8090` | Port the web app listens on |
 | `OLLAMA_HOST` | `http://localhost:11434` | Where Ollama is running |
-| `OLLAMA_MODEL` | `gemma3:4b` | Which pulled model to use |
+| `OLLAMA_MODEL` | `gemma4:e4b` | Which pulled model to use |
 | `OLLAMA_NUM_CTX` | `16384` | Context window — raise it if your files grow large |
+| `OLLAMA_KEEP_ALIVE` | `10m` | How long Ollama keeps the model loaded in RAM between questions |
 | `CMD_GENIE_DATA` | `./data` | Directory of `*.md` knowledge files |
 
 ```bash
@@ -147,6 +153,20 @@ Dockerfile             single-container image (UI + API)
 docker-compose.yml     run it with ./data bind-mounted for persistence
 run.sh                 local launcher (uv)
 ```
+
+## Performance
+
+Responses stream, so you see tokens as soon as the model produces them. Two
+things affect how fast that first token appears:
+
+- **First call after idle is slow** — the model (a few GB) has to load into RAM.
+  Click **Load model** in the header to preload it before you ask (the badge dot
+  turns green when it's ready). cmd-genie also sets `OLLAMA_KEEP_ALIVE=10m`, so
+  once loaded it stays resident for 10 minutes of inactivity and later questions
+  start almost instantly. Bump it (e.g. `30m`) if you ask in bursts.
+- **Model size** — `gemma4:e4b` is a good balance. For snappier replies on a
+  modest machine, try a smaller model (`OLLAMA_MODEL=gemma4:e2b`); for better
+  answers at the cost of speed, a larger one.
 
 ## Ideas / roadmap
 

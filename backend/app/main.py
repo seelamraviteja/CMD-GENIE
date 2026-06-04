@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -141,32 +141,67 @@ Rules:
 Rewritten text:"""
 
 
+def _stream(prompt: str, temperature: float | None = None) -> StreamingResponse:
+    """Stream a model answer to the client as plain UTF-8 text, token by token.
+
+    Errors surface as text in the body: the stream is already a 200 by the time
+    the model is reached, so the UI just shows the ⚠️ message inline.
+    """
+
+    async def gen():
+        try:
+            async for chunk in gemma.generate_stream(prompt, temperature=temperature):
+                yield chunk
+        except gemma.ModelError as exc:
+            yield f"\n⚠️ {exc}"
+
+    # X-Accel-Buffering off keeps any intermediary from buffering the stream.
+    return StreamingResponse(
+        gen(),
+        media_type="text/plain; charset=utf-8",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
 @app.post("/api/ask")
-async def ask(req: AskRequest) -> dict[str, str]:
+async def ask(req: AskRequest) -> StreamingResponse:
     question = (req.question or "").strip()
     if not question:
-        return {"answer": "Ask me how to do something — e.g. *undo my last commit*.", "ok": "false"}
-    prompt = _build_prompt(question, _load_knowledge())
-    try:
-        answer = await gemma.generate(prompt)
-    except gemma.ModelError as exc:
-        return {"answer": f"⚠️ {exc}", "ok": "false"}
-    return {"answer": answer or "(no response)", "ok": "true"}
+        return _text("Ask me how to do something — e.g. *undo my last commit*.")
+    return _stream(_build_prompt(question, _load_knowledge()))
 
 
 @app.post("/api/rephrase")
-async def rephrase(req: RephraseRequest) -> dict[str, str]:
+async def rephrase(req: RephraseRequest) -> StreamingResponse:
     text = (req.text or "").strip()
     if not text:
-        return {"result": "", "ok": "false"}
+        return _text("")
     instruction = REPHRASE_MODES.get(req.mode, REPHRASE_MODES["polish"])
-    prompt = _build_rephrase_prompt(text, instruction)
+    # A little more warmth than command lookup, so it reads naturally.
+    return _stream(_build_rephrase_prompt(text, instruction), temperature=0.4)
+
+
+def _text(message: str) -> StreamingResponse:
+    async def one():
+        yield message
+
+    return StreamingResponse(one(), media_type="text/plain; charset=utf-8")
+
+
+@app.get("/api/warm")
+async def warm_status() -> dict[str, object]:
+    """Is the model already resident? (for the 'Load model' button state)"""
+    return {"loaded": await gemma.is_loaded(), "model": gemma.OLLAMA_MODEL}
+
+
+@app.post("/api/warm")
+async def warm() -> dict[str, object]:
+    """Preload the model so the first question is instant."""
     try:
-        # A little more warmth than command lookup, so it reads naturally.
-        result = await gemma.generate(prompt, temperature=0.4)
+        await gemma.warm()
     except gemma.ModelError as exc:
-        return {"result": f"⚠️ {exc}", "ok": "false"}
-    return {"result": result or "(no response)", "ok": "true"}
+        return {"ok": False, "error": str(exc), "model": gemma.OLLAMA_MODEL}
+    return {"ok": True, "model": gemma.OLLAMA_MODEL}
 
 
 @app.get("/api/files")
