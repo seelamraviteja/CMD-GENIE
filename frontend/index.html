@@ -414,7 +414,8 @@
   function setView(v, push) {
     applyView(v);
     const path = v === "rephrase" ? "/rephrase" : "/";
-    if (push && location.pathname !== path) history.pushState({ v }, "", path);
+    // NB: window.history — the local `history` var (chat log) shadows the global.
+    if (push && location.pathname !== path) window.history.pushState({ v }, "", path);
   }
   $("nav").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-view]"); if (!b) return;

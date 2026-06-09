@@ -247,5 +247,9 @@ def health() -> dict[str, str]:
 @app.get("/rephrase")
 def index():
     """The SPA. The same page serves every client-side route, so /rephrase and
-    /ask are directly loadable / refreshable / shareable."""
-    return FileResponse(INDEX_FILE)
+    /ask are directly loadable / refreshable / shareable.
+
+    no-cache: always revalidate the HTML so a UI update is picked up on reload
+    (the browser still uses its copy if unchanged, but never serves it stale).
+    """
+    return FileResponse(INDEX_FILE, headers={"Cache-Control": "no-cache"})
