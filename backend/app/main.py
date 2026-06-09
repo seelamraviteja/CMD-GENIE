@@ -53,12 +53,24 @@ def _safe_data_path(name: str) -> Path:
     return path
 
 
+_knowledge_cache: tuple[tuple, str] | None = None
+
+
 def _load_knowledge() -> str:
-    """Concatenate every knowledge file, each under a clear header."""
-    parts: list[str] = []
-    for path in _knowledge_files():
-        parts.append(f"### FILE: {path.name}\n{path.read_text()}")
-    return "\n\n".join(parts) if parts else "(no knowledge files yet)"
+    """Concatenate every knowledge file, each under a clear header.
+
+    Cached on the (path, mtime) of the files, so we only re-read from disk when
+    something actually changed — edits in the 'My data' panel invalidate it.
+    """
+    global _knowledge_cache
+    files = _knowledge_files()
+    fingerprint = tuple((str(p), p.stat().st_mtime_ns) for p in files)
+    if _knowledge_cache and _knowledge_cache[0] == fingerprint:
+        return _knowledge_cache[1]
+    parts = [f"### FILE: {p.name}\n{p.read_text()}" for p in files]
+    text = "\n\n".join(parts) if parts else "(no knowledge files yet)"
+    _knowledge_cache = (fingerprint, text)
+    return text
 
 
 def _build_prompt(question: str, knowledge: str) -> str:
@@ -163,6 +175,13 @@ def _stream(prompt: str, temperature: float | None = None) -> StreamingResponse:
     )
 
 
+def _text(message: str) -> StreamingResponse:
+    async def one():
+        yield message
+
+    return StreamingResponse(one(), media_type="text/plain; charset=utf-8")
+
+
 @app.post("/api/ask")
 async def ask(req: AskRequest) -> StreamingResponse:
     question = (req.question or "").strip()
@@ -179,13 +198,6 @@ async def rephrase(req: RephraseRequest) -> StreamingResponse:
     instruction = REPHRASE_MODES.get(req.mode, REPHRASE_MODES["polish"])
     # A little more warmth than command lookup, so it reads naturally.
     return _stream(_build_rephrase_prompt(text, instruction), temperature=0.4)
-
-
-def _text(message: str) -> StreamingResponse:
-    async def one():
-        yield message
-
-    return StreamingResponse(one(), media_type="text/plain; charset=utf-8")
 
 
 @app.get("/api/warm")
@@ -231,5 +243,9 @@ def health() -> dict[str, str]:
 
 
 @app.get("/")
+@app.get("/ask")
+@app.get("/rephrase")
 def index():
+    """The SPA. The same page serves every client-side route, so /rephrase and
+    /ask are directly loadable / refreshable / shareable."""
     return FileResponse(INDEX_FILE)

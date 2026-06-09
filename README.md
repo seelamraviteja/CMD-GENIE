@@ -76,6 +76,9 @@ same local model fixes its grammar and structure. Pick a style — *Polish,
 Concise, Professional, Friendly, Formal,* or *Bullet points* — and copy the
 result. `POST /api/rephrase` with `{ "text": "...", "mode": "polish" }`.
 
+Each view has its own URL — **Ask** at `/` and **Rephrase** at `/rephrase` — so
+they're bookmarkable and survive a refresh; **New** opens a fresh `/`.
+
 ## Requirements
 
 - [`uv`](https://docs.astral.sh/uv/) — Python 3.10+ environment manager
@@ -160,10 +163,10 @@ Responses stream, so you see tokens as soon as the model produces them. Two
 things affect how fast that first token appears:
 
 - **First call after idle is slow** — the model (a few GB) has to load into RAM.
-  Click **Load model** in the header to preload it before you ask (the badge dot
-  turns green when it's ready). cmd-genie also sets `OLLAMA_KEEP_ALIVE=10m`, so
-  once loaded it stays resident for 10 minutes of inactivity and later questions
-  start almost instantly. Bump it (e.g. `30m`) if you ask in bursts.
+  cmd-genie **auto-warms it when the page opens** (and the **Load model** button
+  preloads on demand; the badge dot turns green when ready). `OLLAMA_KEEP_ALIVE=10m`
+  then keeps it resident for 10 minutes of inactivity, so later questions start
+  almost instantly. Bump it (e.g. `30m`) if you ask in bursts.
 - **Model size** — `gemma4:e4b` is a good balance. For snappier replies on a
   modest machine, try a smaller model (`OLLAMA_MODEL=gemma4:e2b`); for better
   answers at the cost of speed, a larger one.

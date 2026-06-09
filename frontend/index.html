@@ -367,7 +367,11 @@
   function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
   function toBottom() { scroll.scrollTop = scroll.scrollHeight; }
-  function inlineHTML(line) { return esc(line).replace(/`([^`]+)`/g, '<code class="inline">$1</code>'); }
+  function inlineHTML(line) {
+    return esc(line)
+      .replace(/`([^`]+)`/g, '<code class="inline">$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  }
 
   // Clipboard with a fallback: navigator.clipboard only exists in a secure
   // context (https or localhost). Over plain http (e.g. http://my-cmd-gemini.com)
@@ -394,16 +398,29 @@
     setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1200);
   }
 
-  // ── view switching ────────────────────────────────────────
-  $("nav").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-view]"); if (!b) return;
-    const v = b.dataset.view;
-    [...$("nav").children].forEach((x) => x.classList.toggle("active", x === b));
+  // ── view switching + routing ──────────────────────────────
+  // Each view has its own URL path: Ask = "/", Rephrase = "/rephrase".
+  // The backend serves the SPA for both, so they're refreshable & shareable.
+  function viewFromPath() {
+    return location.pathname.replace(/\/+$/, "") === "/rephrase" ? "rephrase" : "ask";
+  }
+  function applyView(v) {
+    [...$("nav").children].forEach((x) => x.classList.toggle("active", x.dataset.view === v));
     $("view-ask").classList.toggle("active", v === "ask");
     $("view-rephrase").classList.toggle("active", v === "rephrase");
     document.body.classList.toggle("on-rephrase", v === "rephrase");
     (v === "ask" ? q : $("rinput")).focus();
+  }
+  function setView(v, push) {
+    applyView(v);
+    const path = v === "rephrase" ? "/rephrase" : "/";
+    if (push && location.pathname !== path) history.pushState({ v }, "", path);
+  }
+  $("nav").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-view]"); if (!b) return;
+    setView(b.dataset.view, true);
   });
+  window.addEventListener("popstate", () => applyView(viewFromPath()));
 
   // ── ask view ──────────────────────────────────────────────
   function addMsg(role) {
@@ -487,7 +504,7 @@
   send.onclick = ask;
   q.addEventListener("input", autosize);
   q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); } });
-  $("newChat").onclick = () => { history = []; persist(); showEmpty(); q.focus(); };
+  $("newChat").onclick = () => { history = []; persist(); showEmpty(); setView("ask", true); q.focus(); };
 
   // ── rephrase view ─────────────────────────────────────────
   const MODES = [
@@ -550,8 +567,7 @@
     warmBtn.classList.toggle("ready", on);
     if (!warmBtn.dataset.busy) warmLbl.textContent = on ? "Model ready" : "Load model";
   }
-  async function refreshLoaded() { try { const d = await (await fetch("/api/warm")).json(); setLoaded(!!d.loaded); } catch {} }
-  warmBtn.onclick = async () => {
+  async function doWarm() {
     if (warmBtn.dataset.busy) return;
     warmBtn.dataset.busy = "1"; warmBtn.disabled = true; warmBtn.classList.add("loading"); warmLbl.textContent = "Loading…";
     try {
@@ -560,10 +576,20 @@
       if (!d.ok) warmLbl.textContent = "Load failed";
     } catch { delete warmBtn.dataset.busy; warmLbl.textContent = "Load failed"; }
     finally { warmBtn.disabled = false; warmBtn.classList.remove("loading"); }
-  };
+  }
+  warmBtn.onclick = doWarm;
+
+  // On load: if the model isn't resident, warm it automatically in the
+  // background so the first question is rarely slow. (Manual button still works.)
+  async function autoWarm() {
+    try {
+      const d = await (await fetch("/api/warm")).json();
+      if (d.loaded) setLoaded(true); else doWarm();
+    } catch {}
+  }
 
   fetch("/api/health").then((r) => r.json()).then((d) => { $("modelName").textContent = d.model || "ollama"; }).catch(() => { $("modelName").textContent = "offline"; });
-  refreshLoaded();
+  autoWarm();
 
   // ── data drawer ───────────────────────────────────────────
   const drawer = $("drawer"), scrim = $("scrim"), tabs = $("tabs"), editor = $("editor");
@@ -588,7 +614,8 @@
   };
 
   // ── boot ──────────────────────────────────────────────────
-  load(); renderHistory(); autosize(); updateCount(); q.focus();
+  load(); renderHistory(); autosize(); updateCount();
+  applyView(viewFromPath());   // open the view that matches the URL (e.g. /rephrase)
 </script>
 </body>
 </html>

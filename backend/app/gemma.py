@@ -1,8 +1,9 @@
 """Thin client for a locally-running Ollama model (Gemma, Llama, …).
 
-We use the plain ``/api/generate`` endpoint (non-streaming) to keep things
-simple: one request in, one answer out. Host and model are env-configurable so
-you can point at a remote Ollama or swap the model.
+We stream from the ``/api/generate`` endpoint so answers appear token-by-token
+(``generate_stream``); ``generate`` is a convenience wrapper that collects the
+full text. Host and model are env-configurable so you can point at a remote
+Ollama or swap the model.
 
 Why ``num_ctx`` matters: Ollama defaults to a tiny ~2048-token context window.
 cmd-genie stuffs your whole cheat-sheet into the prompt, which is easily larger
